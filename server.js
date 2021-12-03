@@ -2,9 +2,6 @@
 const app = express();
 const mongoose = require("mongoose");
 //Basico arriba
-const cors = require("cors");
-const passport = require("passport");
-
 require("dotenv/config");
 //import routes
 app.use(express.urlencoded({ extended: true }));
@@ -29,4 +26,4 @@ try {
   console.log("Error al conectar a la base de datos.");
 }
 //Execution
-app.listen(3000);
+app.listen(3000, () => { console.log("Corriendo en puerto 3000");});
