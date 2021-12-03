@@ -16,6 +16,7 @@ const nivelUsuario = (nivel) => {
 //Listar todos los usuarios
 router.get("/listarTodos", async (req, res) => {
   try {
+    console.log("XD");
     const usuarios = await Usuario.find();
     res.json(usuarios);
   } catch (err) {

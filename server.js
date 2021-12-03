@@ -19,7 +19,7 @@ app.use("/api/usuarios", apiUsuarios);
 try {
   mongoose.connect(
     process.env.DB_CONNECTION,
-    { useNewUrlParser: true, useUnifiedTopology: true, useFindAndModify: false},
+    { useNewUrlParser: true},
     () => {
       console.log("Conectado a base de datos.");
     }
