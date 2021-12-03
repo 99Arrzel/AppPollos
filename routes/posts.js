@@ -1,4 +1,5 @@
-﻿const { response } = require("express");
+﻿//Esto es una simple plantilla.
+const { response } = require("express");
 const express = require("express");
 const router = express.Router();
 const Post = require("../models/Usuarios/usuarios");

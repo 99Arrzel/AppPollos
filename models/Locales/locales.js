@@ -1,5 +1,4 @@
 ﻿const mongoose = require("mongoose");
-const { boolean } = require("webidl-conversions");
 const Sugerencia = mongoose.Schema({
   id_usuario: {
     type: String,
@@ -16,7 +15,7 @@ const Bandera = mongoose.Schema({
     required: true
   },
   tipo_bandera:{
-    type: boolean,
+    type: Boolean,
     required: true
   },
   bandera: {
@@ -26,7 +25,6 @@ const Bandera = mongoose.Schema({
 });
 
 const Menu = mongoose.Schema({
-  id_plato: mongoose.ObjectID,
   nombre: {
     type: String,
     required: true
@@ -40,7 +38,7 @@ const Menu = mongoose.Schema({
     required: true
   },
   precio: {
-    type: Decimal128,
+    type: Number,
     required: true
   },
   //Default now porque al momento de subir se debe verificar

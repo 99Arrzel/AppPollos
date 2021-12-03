@@ -4,15 +4,23 @@
   "description": "Proyecto para Sistemas Operativos Moviles y Embebidos",
   "main": "index.js",
   "scripts": {
-    "start": "nodemon app.js"
+    "start": "cross-env NODE_ENV=production node server.js",
+    "dev": "cross-env NODE_ENV=development nodemon server.js"
   },
-  "author": "",
-  "license": "ISC",
+  "author": "Link",
+  "license": "MIT",
   "dependencies": {
+    "bcrypt": "^5.0.1",
     "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "cross-env": "^7.0.3",
     "dotenv": "^10.0.0",
     "express": "^4.17.1",
+    "jwt-simple": "^0.5.6",
     "mongoose": "^6.0.13",
-    "nodemon": "^2.0.15"
+    "morgan": "^1.10.0",
+    "nodemon": "^2.0.15",
+    "passport": "^0.5.0",
+    "passport-jwt": "^4.0.0"
   }
 }
