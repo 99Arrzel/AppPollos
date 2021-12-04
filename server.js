@@ -11,7 +11,6 @@ const apiLocales = require("./routes/apiLocales");
 app.use("/api/locales", apiLocales);
 const apiUsuarios = require("./routes/apiUsuarios");
 app.use("/api/usuarios", apiUsuarios);
-
 //Db connection
 try {
   mongoose.connect(

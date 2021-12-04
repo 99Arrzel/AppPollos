@@ -1,39 +1,37 @@
-﻿const { response } = require("express");
-const express = require("express");
-const router = express.Router();
-const Usuario = require("../models/Usuarios/usuarios");
-const bcrypt = require("bcryptjs");
+﻿let { response } = require("express");
+let express = require("express");
+let router = express.Router();
+let Usuario = require("../models/Usuarios/usuarios");
+let bcrypt = require("bcryptjs");
 //Requirement of json web token, just to replace sessions
-const jwt = require("jsonwebtoken");
-const { isValidObjectId } = require("mongoose");
+let jwt = require("jsonwebtoken");
+let { isValidObjectId } = require("mongoose");
 require("dotenv/config"); //Get secretkey from dotenv
-const secretkey = process.env.SECRET_KEY;
+let secretkey = process.env.SECRET_KEY;
 //=====================================================
 function verifyToken(req, res, next) {
-  const bearerHeader = req.headers.authorization;
+  let bearerHeader = req.headers.authorization;
   if (typeof bearerHeader !== "undefined") {
-    const bearerToken = bearerHeader.split(" ")[1];
+    let bearerToken = bearerHeader.split(" ")[1];
     req.token = bearerToken;
     next();
   } else {
-    res.sendStatus(403);
+    res.status(403).send({ message: "Fallo en la verificacion" });
   }
 }
 //======================================================
 //Hash de password para usuario
-const passUsuario = (pass) => {
+let passUsuario = (pass) => {
   let salt = bcrypt.genSaltSync(10);
-  let hash = bcrypt.hashSync(pass, salt);
-  return hash;
+  return  bcrypt.hashSync(pass, salt);
 };
 //=============================
 //Check if user is admin
 async function isAdmin(id) {
   if (isValidObjectId(id)) {
-    const usuario = await Usuario.findById(id);
+    let usuario = await Usuario.findById(id);
     if (usuario != undefined) {
       if (usuario.nivel == "ADMIN") {
-        console.log("WTF");
         return true;
       }
     }
@@ -42,12 +40,12 @@ async function isAdmin(id) {
   return false; //No es un object ID valido.
 }
 function isTheUserModifyingHimself(modified_id, idUser) {
-    if (isValidObjectId(modified_id) && isValidObjectId(idUser)) {
-      if (modified_id == idUser) {
-        return true;
-      }
-      return false;
+  if (isValidObjectId(modified_id) && isValidObjectId(idUser)) {
+    if (modified_id == idUser) {
+      return true;
     }
+    return false;
+  }
   return false; //No es un object ID valido.
 }
 //Comparar contraseña con la almacenada.
@@ -82,7 +80,7 @@ router.post("/login", async (req, res) => {
 //Crear usuario !FLAGS == ADMIN ONLY!
 router.get("/listarTodos", verifyToken, async (req, res) => {
   try {
-    const usuarios = await Usuario.find();
+    let usuarios = await Usuario.find();
     jwt.verify(req.token, secretkey, (err, authData) => {
       if (err) {
         res.send(403); //if there's an error veryfing, then send 403
@@ -109,7 +107,7 @@ router.post("/crearUsuario", async (req, res) => {
       //Mes dia año, en ese formato
       return new Date(fecha);
     }
-    const nuevoUsuario = new Usuario({
+    let nuevoUsuario = new Usuario({
       nombre: req.body.nombre,
       apellido: req.body.apellido,
       nivel: "USUARIO",
@@ -132,54 +130,49 @@ router.post("/crearUsuario", async (req, res) => {
     res.json({ message: err });
   }
 });
-//Dar de baja usuario !FLAGS = ADMIN ONLY!
-router.delete("/darDeBaja/", verifyToken, (req, res) => {
+//Dar de baja usuario !FLAGS = ADMIN ONLY! - OK
+router.delete("/darDeBaja", verifyToken, (req, res) => {
   try {
-    jwt.verify(req.token, secretkey, async (err, authData) => {
+    jwt.verify(req.token, secretkey, (err, authData) => {
+      if (!isValidObjectId(req.body.idUsuario)) {
+        res.status(400).send({ message: "Ese id es invalido." });
+        return;
+      }
       if (err) {
-        res.sendStatus(403); //if there's an error veryfing, then send 403
+        res.status(403).send({ message: "Debes estar logeado para esto." }); //if there's an error veryfing, then send 403
       } else {
-        if (isAdmin(authData._id)) {
-          if (
-            req.body.idUsuario == undefined ||
-            req.body.idUsuario.length == 0
-          ) {
-            res
-              .status(400)
-              .send({ message: "Debe proveer un ID para dar de baja." });
-            return;
+        isAdmin(authData.usuario._id).then(async (result) => {
+          console.log(result);
+          if (result) {
+            let idDeBaja = await Usuario.updateOne(
+              { _id: req.body.idUsuario },
+              { $set: { estado: "INACTIVO" } }
+            );
+            if (idDeBaja.matchedCount != 0) {
+              res.status(200).send({
+                message: "Usuario dado de BAJA",
+                idDeBaja,
+                authData,
+              });
+              return;
+            } else {
+              res.status(400).send({
+                message: "Usuario no encontrado.",
+                idDeBaja,
+                authData,
+              });
+            }
           }
-          if (!isValidObjectId(req.body.idUsuario)) {
-            res.status(400).send({ message: "El id es invalido" });
-            return;
+          else {
+            res.status(403).send({message:"Sin permisos para esto"});
           }
-          const idDeBaja = await Usuario.updateOne(
-            { _id: req.body.idUsuario },
-            { $set: { estado: "INACTIVO" } }
-          );
-          if (idDeBaja.matchedCount != 0) {
-            res.status(200).send({
-              message: "Usuario dado de baja",
-              idDeBaja,
-              authData,
-            });
-            return;
-          } else {
-            res.status(400).send({
-              message: "Usuario no encontrado.",
-              idDeBaja,
-              authData,
-            });
-          }
-        }
-        res.status(403).send({ message: "Acceso denegado" }); //if there's an error veryfing, then send 403
+        });
       }
     });
   } catch (err) {
     res.json({ message: err });
   }
-});
-//modificar usuario !FLAGS == ADMIN AND SAME USER ONLY! -- OK
+});//modificar usuario !FLAGS == ADMIN AND SAME USER ONLY! -- OK
 router.patch("/modificar", verifyToken, (req, res) => {
   if (!isValidObjectId(req.body.idUsuario)) {
     res.status(400).send({ message: "El id a modificar no es un id valido." });
@@ -189,7 +182,7 @@ router.patch("/modificar", verifyToken, (req, res) => {
     jwt.verify(req.token, secretkey, async (err, authData) => {
       isAdmin(authData.usuario._id).then(async (result) => {
         if (result) {
-          const modificarUsuario = await Usuario.updateOne(
+          let modificarUsuario = await Usuario.updateOne(
             { _id: req.body.idUsuario },
             {
               $set: {
@@ -208,9 +201,10 @@ router.patch("/modificar", verifyToken, (req, res) => {
             modificarUsuario,
             authData,
           });
-        }
-        else if(isTheUserModifyingHimself(req.body.idUsuario, authData.usuario._id)){
-          const modificarUsuario = await Usuario.updateOne(
+        } else if (
+          isTheUserModifyingHimself(req.body.idUsuario, authData.usuario._id)
+        ) {
+          let modificarUsuario = await Usuario.updateOne(
             { _id: req.body.idUsuario },
             {
               $set: {
@@ -229,8 +223,7 @@ router.patch("/modificar", verifyToken, (req, res) => {
             modificarUsuario,
             authData,
           });
-        }
-        else {
+        } else {
           res.status(400).send({ message: "Sin autorización" });
         }
       });
@@ -239,100 +232,182 @@ router.patch("/modificar", verifyToken, (req, res) => {
     res.json({ message: err });
   }
 });
-//set usuario como admin - OK
-router.patch("/setAdmin", async (req, res) => {
+//set usuario como admin  XD - OK
+//!FLAGS - ADMIN ONLY!
+router.patch("/setAdmin", verifyToken, (req, res) => {
   try {
     if (!isValidObjectId(req.body.idUsuario)) {
       res.status(400).send({ message: "El id invalido" });
       return;
     }
-    isAdmin(authData.usuario._id)
-    const elevarUsuario = await Usuario.updateOne(
-      { _id: req.body.idUsuario },
-      { $set: { nivel: "ADMIN" } }
-    );
-    res.json(elevarUsuario);
+    jwt.verify(req.token, secretkey, (err, authData) => {
+      isAdmin(authData.usuario._id).then(async (result) => {
+        if (result) {
+          let elevarUsuario = await Usuario.updateOne(
+            { _id: req.body.idUsuario },
+            { $set: { nivel: "ADMIN" } }
+          );
+          if (elevarUsuario.matchedCount != 0) {
+            res
+              .status(200)
+              .send({
+                message: "ADMIN seteado con exito",
+                elevarUsuario,
+                authData,
+              });
+            return;
+          }
+          res
+            .status(400)
+            .send({
+              message: "El id no fue encontrado",
+              elevarUsuario,
+              authData,
+            });
+        } else {
+          res.status(400).send("No permitido.");
+        }
+      });
+    });
   } catch (err) {
     res.json({ message: err });
   }
 });
 //set usuario como moderador
-router.patch("/setModerador/:idUsuario", async (req, res) => {
+//!FLAGS - ADMIN ONLY! - OK
+router.patch("/setModerador", verifyToken, (req, res) => {
   try {
-    const elevarUsuario = await Usuario.updateOne(
-      { _id: req.params.idUsuario },
-      { $set: { nivel: "MODERADOR" } }
-    );
-    res.json(elevarUsuario);
+    if (!isValidObjectId(req.body.idUsuario)) {
+      res.status(400).send({ message: "El id invalido" });
+      return;
+    }
+    jwt.verify(req.token, secretkey, (err, authData) => {
+      isAdmin(authData.usuario._id).then(async (result) => {
+        if (result) {
+          let elevarUsuario = await Usuario.updateOne(
+            { _id: req.body.idUsuario },
+            { $set: { nivel: "MODERADOR" } }
+          );
+          if (elevarUsuario.matchedCount != 0) {
+            res
+              .status(200)
+              .send({
+                message: "MODERADOR seteado con exito",
+                elevarUsuario,
+                authData,
+              });
+            return;
+          }
+          res
+            .status(400)
+            .send({
+              message: "El id no fue encontrado",
+              elevarUsuario,
+              authData,
+            });
+        } else {
+          res.status(400).send("No permitido.");
+        }
+      });
+    });
   } catch (err) {
     res.json({ message: err });
-  }
-});
-//set usuario como usuario
-router.patch("/setUsuario/:idUsuario", async (req, res) => {
-  try {
-    const elevarUsuario = await Usuario.updateOne(
-      { _id: req.params.idUsuario },
-      { $set: { nivel: "USUARIO" } }
-    );
-    res.json(elevarUsuario);
-  } catch (err) {
-    res.json({ message: err });
+    console.log(err);
   }
 });
 //Comentario en usuario
-router.patch("/addComentario/:idUsuario", async (req, res) => {
+//!FLAGS - PUBLIC! NO MATCH SAME ID USER, NO MULTIPLE COMMENTS - OK
+router.patch("/addComentario", verifyToken, async (req, res) => { //Verifiy token para ver si está logeado
   try {
-    const esteUsuario = await Usuario.findById(req.params.idUsuario);
+    if (req.body.estrellas > 10 || req.body.estrellas < 0) {
+      res.status(400).send({message:"La puntuación de estrellas es de 0 a 10, donde cada unidad es media estrella 5/5, no puede ser mayor que 10 y menor que 0."});
+      return;
+    }
+    let esteUsuario = await Usuario.findById(req.body.idUsuario); //Busco al usuario
     let arrayIdsComentaristas = esteUsuario.calificacion.map((item) => {
       return item.id_usuario;
     });
-    if (arrayIdsComentaristas.includes(req.body.idUsuario)) {
-      res.json({ message: "Este usuario ya comentó en este usuario." });
-      return; //Parece que se sigue ejecutando el código de abajo
-    }
-    let nuevaCalificacion = {
-      id_usuario: req.body.idUsuario,
-      comentario: req.body.comentario,
-      estrellas: req.body.estrellas,
-    };
-    const comentarUsuario = await Usuario.updateOne(
-      { _id: req.params.idUsuario },
-      { $push: { calificacion: nuevaCalificacion } }
-    );
-    res.json(comentarUsuario);
+    console.log(arrayIdsComentaristas);
+    jwt.verify(req.token, secretkey, async (err, authData) => {
+      console.log(authData.usuario._id);
+      if (arrayIdsComentaristas.includes(authData.usuario._id)) {
+        res.json({ message: "Este usuario ya comentó en este usuario." });
+        return; //Parece que se sigue ejecutando el código de abajo
+      }
+      let nuevaCalificacion = {
+        id_usuario: authData.usuario._id,
+        comentario: req.body.comentario,
+        estrellas: req.body.estrellas,
+      };
+      //Crea un nuevo comentario, además le da un id, para poder marcarlo o algo así en futuro
+      let comentarUsuario = await Usuario.updateOne(
+        { _id: req.body.idUsuario },
+        { $push: { calificacion: nuevaCalificacion } }
+      );
+      res.json(comentarUsuario);
+    });
   } catch (err) {
     res.json({ message: err });
+    console.log(err);
   }
 });
 //Get Usuario por ID
-router.get("/buscarUsuario/:idUsuario", async (req, res) => {
+router.get("/buscarUsuario", verifyToken, async (req, res) => {
   try {
-    const esteUsuario = await Usuario.findById(req.params.idUsuario);
-    res.json(esteUsuario);
+    let esteUsuario = await Usuario.findById(req.body.idUsuario);
+    jwt.verify(req.token, secretkey, async (err, authData) => {
+      isAdmin(authData.usuario._id).then((result) => {
+        if (result) {
+          res.status(200).send(esteUsuario);
+        }
+        else {
+          res.status(403).send({ message: "No tienes permisos para buscar por ID" });
+        }
+      });
+    });
   } catch (err) {
     res.json({ message: err });
   }
 });
-
-router.patch("/darDeBaja/:idUsuario", async (req, res) => {
+//!FLAGS - ADMIN ONLY
+router.patch("/darDeAlta", verifyToken, (req, res) => {
   try {
-    const esteUsuario = await Usuario.updateOne(
-      { _id: req.params.idUsuario },
-      { $set: { estado: "INACTIVO" } }
-    );
-    res.json({ message: "Dado de baja con exito", usuario: esteUsuario });
-  } catch (err) {
-    res.json({ message: err });
-  }
-});
-router.patch("/darDeAlta/:idUsuario", async (req, res) => {
-  try {
-    const esteUsuario = await Usuario.updateOne(
-      { _id: req.params.idUsuario },
-      { $set: { estado: "ACTIVO" } }
-    );
-    res.json({ message: "Dado de alta con exito", usuario: esteUsuario });
+    jwt.verify(req.token, secretkey, (err, authData) => {
+      if (!isValidObjectId(req.body.idUsuario)) {
+        res.status(400).send({ message: "Ese id es invalido." });
+        return;
+      }
+      if (err) {
+        res.status(403).send({ message: "Debes estar logeado para esto." }); //if there's an error veryfing, then send 403
+      } else {
+        isAdmin(authData.usuario._id).then(async (result) => {
+          console.log(result);
+          if (result) {
+            let idDeBaja = await Usuario.updateOne(
+              { _id: req.body.idUsuario },
+              { $set: { estado: "ACTIVO" } }
+            );
+            if (idDeBaja.matchedCount != 0) {
+              res.status(200).send({
+                message: "Usuario dado de alta",
+                idDeBaja,
+                authData,
+              });
+              return;
+            } else {
+              res.status(400).send({
+                message: "Usuario no encontrado.",
+                idDeBaja,
+                authData,
+              });
+            }
+          }
+          else {
+            res.status(403).send({message:"Sin permisos para esto"});
+          }
+        });
+      }
+    });
   } catch (err) {
     res.json({ message: err });
   }
