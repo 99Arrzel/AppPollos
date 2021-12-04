@@ -1,6 +1,16 @@
 ﻿const mongoose = require("mongoose");
+const Fotitos = mongoose.Schema({
+  fotografo: {
+    type: String,
+    required: true
+  },
+  direccion: {
+    type: String,
+    required: true
+  }
+});
 const Sugerencia = mongoose.Schema({
-  id_usuario: {
+  creador: {
     type: String,
     required: true
   },
@@ -10,7 +20,7 @@ const Sugerencia = mongoose.Schema({
   }
 });
 const Bandera = mongoose.Schema({
-  id_usuario: {
+  creador: {
     type: String,
     required: true
   },
@@ -27,11 +37,12 @@ const Bandera = mongoose.Schema({
 const Menu = mongoose.Schema({
   nombre: {
     type: String,
-    required: true
+    required: true,
+    unique: true
   },
   foto: {
-    type: [String],
-    required: true
+    type: [Fotitos],
+    required: false
   },
   descripcion: {
     type: String,
@@ -46,7 +57,7 @@ const Menu = mongoose.Schema({
     type: Date,
     default: Date.now
   },
-  id_usuario: {
+  creador: {
     type: String,
     required: true
   }
@@ -59,7 +70,7 @@ const L_Calificaciones = mongoose.Schema({
   },
   comentario: {
     type: String,
-    required: true,
+    required: false,
   },
   estrellas: {
     type: Number,
@@ -77,7 +88,7 @@ const LocalSchema = mongoose.Schema({
   },
   //Direcciones de fotos del local, es público, no es requerido
   fotos: {
-    type: [String],
+    type: [Fotitos],
     required: false,
   },
   coordenadas: {
@@ -105,6 +116,10 @@ const LocalSchema = mongoose.Schema({
   banderas: {
     type: [Bandera],
     required: false
+  },
+  creador: {
+    type: String,
+    required: true
   }
 });
 module.exports = mongoose.model('Locales', LocalSchema);
