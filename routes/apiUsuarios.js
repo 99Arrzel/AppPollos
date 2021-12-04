@@ -5,6 +5,7 @@ const Usuario = require("../models/Usuarios/usuarios");
 const bcrypt = require("bcryptjs");
 //Requirement of json web token, just to replace sessions
 const jwt = require("jsonwebtoken");
+const { isValidObjectId } = require("mongoose");
 require("dotenv/config"); //Get secretkey from dotenv
 const secretkey = process.env.SECRET_KEY;
 //=====================================================
@@ -19,33 +20,53 @@ function verifyToken(req, res, next) {
   }
 }
 //======================================================
+//Hash de password para usuario
 const passUsuario = (pass) => {
   let salt = bcrypt.genSaltSync(10);
   let hash = bcrypt.hashSync(pass, salt);
-  console.log(hash);
   return hash;
 };
-const posiblesRoles = ["ADMIN", "MODERADOR", "USUARIO"];
-const nivelUsuario = (nivel) => {
-  return posiblesRoles.includes(nivel) ? nivel : "USUARIO";
-};
-
+//=============================
+//Check if user is admin
+async function isAdmin(id) {
+  if (isValidObjectId(id)) {
+    const usuario = await Usuario.findById(id);
+    if (usuario != undefined) {
+      if (usuario.nivel == "ADMIN") {
+        console.log("WTF");
+        return true;
+      }
+    }
+    return false;
+  }
+  return false; //No es un object ID valido.
+}
+function isTheUserModifyingHimself(modified_id, idUser) {
+    if (isValidObjectId(modified_id) && isValidObjectId(idUser)) {
+      if (modified_id == idUser) {
+        return true;
+      }
+      return false;
+    }
+  return false; //No es un object ID valido.
+}
 //Comparar contraseña con la almacenada.
 //Listar todos los usuarios
 router.post("/login", async (req, res) => {
   try {
-    const usuario = await Usuario.find({ correo: req.body.correo });
-    if (usuario.length != 0) {
-      console.log(req.body.password, usuario[0].password);
-      if (bcrypt.compareSync(req.body.password, usuario[0].password)) {
+    let usuario = await Usuario.find({ correo: req.body.correo });
+    usuario = usuario[0];
+    if (usuario) {
+      //Si existe
+      console.log(req.body.password, usuario.password);
+      if (bcrypt.compareSync(req.body.password, usuario.password)) {
         jwt.sign({ usuario }, secretkey, (err, token) => {
           res.status(200).send({ token });
         });
         return;
       }
       res.status(403).send({ message: "Contraseña erronea." });
-    }
-    else {
+    } else {
       if (req.body.correo === undefined) {
         res.status(403).send({ message: "Introduce un correo" });
         return;
@@ -54,6 +75,7 @@ router.post("/login", async (req, res) => {
       return;
     }
   } catch (err) {
+    console.log(err);
     res.json({ message: "Hubo un error", err });
   }
 });
@@ -64,17 +86,16 @@ router.get("/listarTodos", verifyToken, async (req, res) => {
     jwt.verify(req.token, secretkey, (err, authData) => {
       if (err) {
         res.send(403); //if there's an error veryfing, then send 403
-      }
-      else {
-        if (authData.usuario[0].nivel == "ADMIN") {
+      } else {
+        if (isAdmin(authData._id)) {
           res.json({
             message: "Lista de usuarios",
             usuarios,
-            authData
+            authData,
           });
           return;
         }
-        res.status(403).send({message: "Acceso denegado"}); //if there's an error veryfing, then send 403
+        res.status(403).send({ message: "Acceso denegado" }); //if there's an error veryfing, then send 403
       }
     });
   } catch (err) {
@@ -111,45 +132,123 @@ router.post("/crearUsuario", async (req, res) => {
     res.json({ message: err });
   }
 });
-//Dar de baja usuario
-router.delete("/darDeBaja/:idUsuario", async (req, res) => {
+//Dar de baja usuario !FLAGS = ADMIN ONLY!
+router.delete("/darDeBaja/", verifyToken, (req, res) => {
   try {
-    const idDeBaja = await Usuario.updateOne({ _id: req.params.idUsuario });
-    res.json(idDeBaja);
-  } catch (err) {
-    res.json({ message: err });
-  }
-});
-//modificar usuario
-router.patch("/modificar/:idUsuario", async (req, res) => {
-  console.log(req.body);
-  try {
-    const modificarUsuario = await Usuario.updateOne(
-      { _id: req.params.idUsuario },
-      {
-        $set: {
-          nombre: req.body.nombre,
-          apellido: req.body.apellido,
-          password: passUsuario(req.body.password),
-          ciudad: req.body.ciudad,
-          comentario_perfil: req.body.comentario_perfil,
-          filtro_lenguaje: req.body.filtro_lenguaje,
-          foto_perfil: req.body.foto_perfil,
-        },
+    jwt.verify(req.token, secretkey, async (err, authData) => {
+      if (err) {
+        res.sendStatus(403); //if there's an error veryfing, then send 403
+      } else {
+        if (isAdmin(authData._id)) {
+          if (
+            req.body.idUsuario == undefined ||
+            req.body.idUsuario.length == 0
+          ) {
+            res
+              .status(400)
+              .send({ message: "Debe proveer un ID para dar de baja." });
+            return;
+          }
+          if (!isValidObjectId(req.body.idUsuario)) {
+            res.status(400).send({ message: "El id es invalido" });
+            return;
+          }
+          const idDeBaja = await Usuario.updateOne(
+            { _id: req.body.idUsuario },
+            { $set: { estado: "INACTIVO" } }
+          );
+          if (idDeBaja.matchedCount != 0) {
+            res.status(200).send({
+              message: "Usuario dado de baja",
+              idDeBaja,
+              authData,
+            });
+            return;
+          } else {
+            res.status(400).send({
+              message: "Usuario no encontrado.",
+              idDeBaja,
+              authData,
+            });
+          }
+        }
+        res.status(403).send({ message: "Acceso denegado" }); //if there's an error veryfing, then send 403
       }
-    );
-
-    res.json(modificarUsuario);
+    });
   } catch (err) {
-    console.log(err);
     res.json({ message: err });
   }
 });
-//set usuario como admin
-router.patch("/setAdmin/:idUsuario", async (req, res) => {
+//modificar usuario !FLAGS == ADMIN AND SAME USER ONLY! -- OK
+router.patch("/modificar", verifyToken, (req, res) => {
+  if (!isValidObjectId(req.body.idUsuario)) {
+    res.status(400).send({ message: "El id a modificar no es un id valido." });
+    return;
+  }
   try {
+    jwt.verify(req.token, secretkey, async (err, authData) => {
+      isAdmin(authData.usuario._id).then(async (result) => {
+        if (result) {
+          const modificarUsuario = await Usuario.updateOne(
+            { _id: req.body.idUsuario },
+            {
+              $set: {
+                nombre: req.body.nombre,
+                apellido: req.body.apellido,
+                password: passUsuario(req.body.password),
+                ciudad: req.body.ciudad,
+                comentario_perfil: req.body.comentario_perfil,
+                filtro_lenguaje: req.body.filtro_lenguaje,
+                foto_perfil: req.body.foto_perfil,
+              },
+            }
+          );
+          res.status(200).send({
+            message: "Usuario modificado con exito.",
+            modificarUsuario,
+            authData,
+          });
+        }
+        else if(isTheUserModifyingHimself(req.body.idUsuario, authData.usuario._id)){
+          const modificarUsuario = await Usuario.updateOne(
+            { _id: req.body.idUsuario },
+            {
+              $set: {
+                nombre: req.body.nombre,
+                apellido: req.body.apellido,
+                password: passUsuario(req.body.password),
+                ciudad: req.body.ciudad,
+                comentario_perfil: req.body.comentario_perfil,
+                filtro_lenguaje: req.body.filtro_lenguaje,
+                foto_perfil: req.body.foto_perfil,
+              },
+            }
+          );
+          res.status(200).send({
+            message: "Cambiaste tu perfil con éxito",
+            modificarUsuario,
+            authData,
+          });
+        }
+        else {
+          res.status(400).send({ message: "Sin autorización" });
+        }
+      });
+    });
+  } catch (err) {
+    res.json({ message: err });
+  }
+});
+//set usuario como admin - OK
+router.patch("/setAdmin", async (req, res) => {
+  try {
+    if (!isValidObjectId(req.body.idUsuario)) {
+      res.status(400).send({ message: "El id invalido" });
+      return;
+    }
+    isAdmin(authData.usuario._id)
     const elevarUsuario = await Usuario.updateOne(
-      { _id: req.params.idUsuario },
+      { _id: req.body.idUsuario },
       { $set: { nivel: "ADMIN" } }
     );
     res.json(elevarUsuario);
@@ -238,5 +337,4 @@ router.patch("/darDeAlta/:idUsuario", async (req, res) => {
     res.json({ message: err });
   }
 });
-
 module.exports = router;
