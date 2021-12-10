@@ -15,8 +15,11 @@ app.use("/api/usuarios", apiUsuarios);
 try {
   mongoose.connect(
     process.env.DB_CONNECTION,
-    { useNewUrlParser: true},
-    () => {
+    { useNewUrlParser: true },
+    (error) => {
+      if (error) {
+        throw new Error(error);
+      }
       console.log("Conectado a base de datos.");
     }
   );
@@ -25,4 +28,6 @@ try {
   console.log("Error al conectar a la base de datos.");
 }
 //Execution
-app.listen(3000, () => { console.log("Corriendo en puerto 3000");});
+app.listen(3000, () => {
+  console.log("Corriendo en puerto 3000");
+});

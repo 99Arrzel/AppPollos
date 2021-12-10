@@ -23,7 +23,7 @@ function verifyToken(req, res, next) {
 //Hash de password para usuario
 let passUsuario = (pass) => {
   let salt = bcrypt.genSaltSync(10);
-  return  bcrypt.hashSync(pass, salt);
+  return bcrypt.hashSync(pass, salt);
 };
 //=============================
 //Check if user is admin
@@ -52,6 +52,7 @@ function isTheUserModifyingHimself(modified_id, idUser) {
 //Listar todos los usuarios
 router.post("/login", async (req, res) => {
   try {
+    console.log(req.body);
     let usuario = await Usuario.find({ correo: req.body.correo });
     usuario = usuario[0];
     if (usuario) {
@@ -124,10 +125,10 @@ router.post("/crearUsuario", async (req, res) => {
         res.json(data);
       })
       .catch((err) => {
-        res.json({ message: err });
+        res.status(400).send({ message: err });
       });
   } catch (err) {
-    res.json({ message: err });
+    res.status(400).send({ message: err });
   }
 });
 //Dar de baja usuario !FLAGS = ADMIN ONLY! - OK
@@ -139,7 +140,7 @@ router.delete("/darDeBaja", verifyToken, (req, res) => {
         return;
       }
       if (err) {
-        res.status(403).send({ message: "Debes estar logeado para esto." }); //if there's an error veryfing, then send 403
+        res.status(403).send({ message: "Debes estar logeado para esto." }); //if there's an error verifying, then send 403
       } else {
         isAdmin(authData.usuario._id).then(async (result) => {
           console.log(result);
@@ -162,9 +163,8 @@ router.delete("/darDeBaja", verifyToken, (req, res) => {
                 authData,
               });
             }
-          }
-          else {
-            res.status(403).send({message:"Sin permisos para esto"});
+          } else {
+            res.status(403).send({ message: "Sin permisos para esto" });
           }
         });
       }
@@ -172,7 +172,7 @@ router.delete("/darDeBaja", verifyToken, (req, res) => {
   } catch (err) {
     res.json({ message: err });
   }
-});//modificar usuario !FLAGS == ADMIN AND SAME USER ONLY! -- OK
+}); //modificar usuario !FLAGS == ADMIN AND SAME USER ONLY! -- OK
 router.patch("/modificar", verifyToken, (req, res) => {
   if (!isValidObjectId(req.body.idUsuario)) {
     res.status(400).send({ message: "El id a modificar no es un id valido." });
@@ -248,22 +248,18 @@ router.patch("/setAdmin", verifyToken, (req, res) => {
             { $set: { nivel: "ADMIN" } }
           );
           if (elevarUsuario.matchedCount != 0) {
-            res
-              .status(200)
-              .send({
-                message: "ADMIN seteado con exito",
-                elevarUsuario,
-                authData,
-              });
-            return;
-          }
-          res
-            .status(400)
-            .send({
-              message: "El id no fue encontrado",
+            res.status(200).send({
+              message: "ADMIN seteado con exito",
               elevarUsuario,
               authData,
             });
+            return;
+          }
+          res.status(400).send({
+            message: "El id no fue encontrado",
+            elevarUsuario,
+            authData,
+          });
         } else {
           res.status(400).send("No permitido.");
         }
@@ -289,22 +285,18 @@ router.patch("/setModerador", verifyToken, (req, res) => {
             { $set: { nivel: "MODERADOR" } }
           );
           if (elevarUsuario.matchedCount != 0) {
-            res
-              .status(200)
-              .send({
-                message: "MODERADOR seteado con exito",
-                elevarUsuario,
-                authData,
-              });
-            return;
-          }
-          res
-            .status(400)
-            .send({
-              message: "El id no fue encontrado",
+            res.status(200).send({
+              message: "MODERADOR seteado con exito",
               elevarUsuario,
               authData,
             });
+            return;
+          }
+          res.status(400).send({
+            message: "El id no fue encontrado",
+            elevarUsuario,
+            authData,
+          });
         } else {
           res.status(400).send("No permitido.");
         }
@@ -317,10 +309,14 @@ router.patch("/setModerador", verifyToken, (req, res) => {
 });
 //Comentario en usuario
 //!FLAGS - PUBLIC! NO MATCH SAME ID USER, NO MULTIPLE COMMENTS - OK
-router.patch("/addComentario", verifyToken, async (req, res) => { //Verifiy token para ver si está logeado
+router.patch("/addComentario", verifyToken, async (req, res) => {
+  //Verifiy token para ver si está logeado
   try {
     if (req.body.estrellas > 10 || req.body.estrellas < 0) {
-      res.status(400).send({message:"La puntuación de estrellas es de 0 a 10, donde cada unidad es media estrella 5/5, no puede ser mayor que 10 y menor que 0."});
+      res.status(400).send({
+        message:
+          "La puntuación de estrellas es de 0 a 10, donde cada unidad es media estrella 5/5, no puede ser mayor que 10 y menor que 0.",
+      });
       return;
     }
     let esteUsuario = await Usuario.findById(req.body.idUsuario); //Busco al usuario
@@ -359,9 +355,10 @@ router.get("/buscarUsuario", verifyToken, async (req, res) => {
       isAdmin(authData.usuario._id).then((result) => {
         if (result) {
           res.status(200).send(esteUsuario);
-        }
-        else {
-          res.status(403).send({ message: "No tienes permisos para buscar por ID" });
+        } else {
+          res
+            .status(403)
+            .send({ message: "No tienes permisos para buscar por ID" });
         }
       });
     });
@@ -401,9 +398,8 @@ router.patch("/darDeAlta", verifyToken, (req, res) => {
                 authData,
               });
             }
-          }
-          else {
-            res.status(403).send({message:"Sin permisos para esto"});
+          } else {
+            res.status(403).send({ message: "Sin permisos para esto" });
           }
         });
       }
